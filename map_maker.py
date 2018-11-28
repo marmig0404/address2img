@@ -13,6 +13,7 @@ class Map_Maker:
         self.addresses = addresses
         self.supporter = Support(config_file)
         self.geolocator = Nominatim(user_agent="AddressConverter")
+        self.supporter.write_to_log('Address2img Initialized.')
 
     def format_address(self, address):
         # Takes address as a string (standard address format)
@@ -24,7 +25,6 @@ class Map_Maker:
         # Takes address as a string (standard address format)
         # Returns coordinate of address
         location = self.geolocator.geocode(address)
-        print(location.address)
         coordinate = [float(location.latitude), float(location.longitude)]
         return coordinate
 
@@ -52,9 +52,18 @@ class Map_Maker:
         extents = Box2d(west_lon, south_lat, east_lon, north_lat)
         return extents
 
-    @staticmethod
-    def get_map_name():
-        return "map.png"
+    def get_map_name(self, address):
+
+        file_type = self.supporter.get_config('Map Image Config', 'Output File Type')
+        image_hash = str(hash(address))[-6:]
+        image_folder = self.supporter.get_config('Map Image Config', 'Image Directory')
+        image_location = os.path.join(image_folder, ('map-' + image_hash + '.' + file_type))
+        return image_location
+
+    def rename_map(self, original_map, address):
+        image_name = self.get_map_name(address)
+        os.rename(original_map, image_name)
+        return image_name
 
     def make_map(self):
         # Renders map with mapnik based off stylesheet and settings in config_file
@@ -68,15 +77,13 @@ class Map_Maker:
 
         hor_distance = float(self.supporter.get_config('Map Image Config', 'Width In Miles'))
         vert_distance = float(self.supporter.get_config('Map Image Config', 'Height in Miles'))
-        image_folder = self.supporter.get_config('Map Image Config', 'Image Directory')
 
         for address in self.addresses:
             self.supporter.write_to_log("Starting to render map for " + self.format_address(address))
             center = self.convert_address(address)
             extents = self.get_extents(center, hor_distance, vert_distance)
             m.zoom_to_box(extents)
-
-            image_name = self.get_map_name()
-            image_location = 'output.png' # str(os.path.join(image_folder, image_name))
-            mapnik.render_to_file(m, image_location)
-            self.supporter.write_to_log("rendered image to '%s'" % image_location)
+            temp_map = 'address2img/temp/temp.png'
+            mapnik.render_to_file(m, temp_map)
+            image_name = self.rename_map(temp_map, address)
+            self.supporter.write_to_log("Rendered image for '%s' to '%s'" % (image_name, self.format_address(address)))
