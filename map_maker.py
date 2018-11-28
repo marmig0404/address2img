@@ -13,16 +13,19 @@ class Map_Maker:
 
     def __init__(self, addresses, config_file='config.ini'):
         self.addresses = addresses
+        self.number_of_addresses = len(addresses)
+        self.number_of_rendered = 0
         self.supporter = Support(config_file)
         self.geolocator = Nominatim(user_agent="AddressConverter")
         self.supporter.write_to_log('Address2img Initialized.')
-        self.supporter.write_to_log('Rendering maps for %s location(s)' % len(addresses))
+        self.supporter.write_to_log('Rendering maps for %s location(s)' % self.number_of_addresses)
 
     def format_address(self, address):
         # Takes address as a string (standard address format)
         # Returns coordinate of address
         location = self.geolocator.geocode(address)
-        return location.address
+        formatted_address = location.address
+        return formatted_address
 
     def convert_address(self, address):
         # Takes address as a string (standard address format)
@@ -30,6 +33,16 @@ class Map_Maker:
         location = self.geolocator.geocode(address)
         coordinate = [float(location.latitude), float(location.longitude)]
         return coordinate
+
+    def check_address(self, address):
+        try:
+            tmp = self.geolocator.geocode(address).address
+            del tmp
+            return True
+        except AttributeError:
+            self.supporter.write_to_log("Invalid Address: " + address)
+            self.supporter.write_to_log("Address does not exist or is formatted incorrectly.")
+            return False
 
     @staticmethod
     def get_extents(center, hor_distance, vert_distance):
@@ -88,16 +101,19 @@ class Map_Maker:
         vert_distance = float(self.supporter.get_config('Map Image Config', 'Height in Miles'))
 
         for address in self.addresses:
-            self.supporter.write_to_log("Starting to render map for " + self.format_address(address))
-            center = self.convert_address(address)
-            extents = self.get_extents(center, hor_distance, vert_distance)
-            m.zoom_to_box(extents)
-            mapnik.render_to_file(m, temp_map)
-            image_name = self.rename_map(temp_map, address)
-            self.supporter.write_to_log("Rendered map for '%s' to '%s'" % (self.format_address(address), image_name))
+            if self.check_address(address):
+                self.supporter.write_to_log("Starting to render map for " + self.format_address(address))
+                center = self.convert_address(address)
+                extents = self.get_extents(center, hor_distance, vert_distance)
+                m.zoom_to_box(extents)
+                mapnik.render_to_file(m, temp_map)
+                image_name = self.rename_map(temp_map, address)
+                self.supporter.write_to_log("Rendered map to '%s' for '%s'" % (image_name, self.format_address(address)))
+                self.number_of_rendered = self.number_of_rendered + 1
 
     def __del__(self):
         end_time = time.time()
         time_to_render = round(end_time - start_time, 2)
-        self.supporter.write_to_log("Rendered maps for %s location(s) in %s seconds." % (len(self.addresses),
-                                                                                         time_to_render))
+        self.supporter.write_to_log("Rendered %s maps for %s location(s) in %s seconds." % (self.number_of_rendered,
+                                                                                            self.number_of_addresses,
+                                                                                            time_to_render))
