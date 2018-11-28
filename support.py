@@ -4,7 +4,7 @@ import time
 
 from backports import configparser
 
-start_time = str(round(time.time(), 0))
+start_time = time.time()
 
 
 class Support:
@@ -27,7 +27,7 @@ class Support:
         log_file_dir = self.get_config("Log Config", 'Log File Location')
         log_file_location = os.path.join(log_file_dir, "log-" + log_time + ".txt")
         log_file = open(log_file_location, "a+")
-        log_file.write("(" + log_time + "/" + start_time + ") " + data_to_write + "\n")
+        log_file.write("(" + log_time + "/" + str(round(start_time, 0)) + ") " + data_to_write + "\n")
         log_file.close()
 
 
