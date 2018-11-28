@@ -21,13 +21,14 @@ class Support:
 
     def write_to_log(self, data_to_write):
         # writes function input to log file and terminal output
+        data_to_write = data_to_write.encode('utf8')
         naming_scheme = self.get_config("Log Config", "Log Naming Scheme")
         log_time = datetime.datetime.now().strftime(naming_scheme)
         print(data_to_write)
         log_file_dir = self.get_config("Log Config", 'Log File Location')
         log_file_location = os.path.join(log_file_dir, "log-" + log_time + ".txt")
         log_file = open(log_file_location, "a+")
-        log_file.write("(" + log_time + "/" + str(round(start_time, 0)) + ") " + data_to_write + "\n")
+        log_file.write("(" + log_time + "/" + repr(round(start_time, 0)) + ") " + str(data_to_write) + "\n")
         log_file.close()
 
 
