@@ -16,7 +16,7 @@ sudo python -m pip install address2img
 
 ## Basic Usage
 To use address2img, the configuration file and mapnik xml file must be configured.
-The configuration file is (config.ini)[config.ini] by default. To configure the mapnik xml file, see (here)[https://github.com/mapnik/mapnik/wiki/XMLConfigReference].
+The configuration file is [config.ini](config.ini) by default. To configure the mapnik xml file, see [here](https://github.com/mapnik/mapnik/wiki/XMLConfigReference).
 
 After the config and xml files are configured, usage is as simple as importing the module and calling the function.
 ```python
