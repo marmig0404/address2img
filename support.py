@@ -21,7 +21,10 @@ class Support:
 
     def write_to_log(self, data_to_write):
         # writes function input to log file and terminal output
-        data_to_write = data_to_write.encode('utf8')
+        try:
+            data_to_write = data_to_write.encode('utf8')
+        except UnicodeDecodeError:
+            data_to_write = data_to_write.decode('utf-8').encode('ascii', 'replace')
         naming_scheme = self.get_config("Log Config", "Log Naming Scheme")
         log_time = datetime.datetime.now().strftime(naming_scheme)
         print(data_to_write)
