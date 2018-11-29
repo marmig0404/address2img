@@ -114,15 +114,25 @@ class Map_Maker:
         hor_distance = float(self.supporter.get_config('Map Image Config', 'Width In Miles'))
         vert_distance = float(self.supporter.get_config('Map Image Config', 'Height in Miles'))
 
-        for address in self.addresses:
-            if self.check_address(address):
-                self.supporter.write_to_log("Starting to render map for " + self.format_address(address))
-                center = self.convert_address(address)
+        for count, address in enumerate(self.addresses):
+            address = str(address.encode('utf-8'))
+            address_is_good = self.check_address(address)[0]
+            if address_is_good:
+                geocoder = self.check_address(address)[1]
+                self.supporter.write_to_log("(%s/%s) Starting to render map for %s" %
+                                            (self.number_of_addresses,
+                                             count,
+                                             self.format_address(geocoder, address)))
+                center = self.convert_address(geocoder, address)
                 extents = self.get_extents(center, hor_distance, vert_distance)
                 m.zoom_to_box(extents)
                 mapnik.render_to_file(m, temp_map)
                 image_name = self.rename_map(temp_map, address)
-                self.supporter.write_to_log("Rendered map to '%s' for '%s'" % (image_name, self.format_address(address)))
+                self.supporter.write_to_log("(%s/%s) Rendered map to '%s' for '%s'" %
+                                            (count,
+                                             self.number_of_addresses,
+                                             image_name,
+                                             self.format_address(geocoder, address)))
                 self.number_of_rendered = self.number_of_rendered + 1
 
     def __del__(self):
