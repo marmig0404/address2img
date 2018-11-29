@@ -3,6 +3,7 @@ import time
 
 import mapnik
 from geographiclib import geodesic, constants
+from geopy.exc import GeocoderTimedOut
 from geopy.geocoders import Nominatim
 from mapnik import Box2d
 
@@ -16,33 +17,46 @@ class Map_Maker:
         self.number_of_addresses = len(addresses)
         self.number_of_rendered = 0
         self.supporter = Support(config_file)
-        self.geolocator = Nominatim(user_agent="AddressConverter")
         self.supporter.write_to_log('Address2img Initialized.')
         self.supporter.write_to_log('Rendering maps for %s location(s)' % self.number_of_addresses)
 
-    def format_address(self, address):
+    @staticmethod
+    def get_geolocator(hash_data):
+        return Nominatim(user_agent=str(hash(hash_data)))
+
+    @staticmethod
+    def format_address(geocoder, address):
         # Takes address as a string (standard address format)
         # Returns coordinate of address
-        location = self.geolocator.geocode(address)
+        location = geocoder.geocode(address)
         formatted_address = location.address
         return formatted_address
 
-    def convert_address(self, address):
+    @staticmethod
+    def convert_address(geocoder, address):
         # Takes address as a string (standard address format)
         # Returns coordinate of address
-        location = self.geolocator.geocode(address)
+        location = geocoder.geocode(address)
         coordinate = [float(location.latitude), float(location.longitude)]
         return coordinate
 
     def check_address(self, address):
-        try:
-            tmp = self.geolocator.geocode(address).address
-            del tmp
-            return True
-        except AttributeError:
-            self.supporter.write_to_log("Invalid Address: " + address)
-            self.supporter.write_to_log("Address does not exist or is formatted incorrectly.")
-            return False
+
+        timed_out = False
+        while not timed_out:
+            try:
+                geocoder = self.get_geolocator('address2img:check' + address)
+                test = geocoder.geocode(address).address
+                del test
+                return True, geocoder
+            except GeocoderTimedOut:
+                self.supporter.write_to_log("Timed out, trying to connect again")
+                time.sleep(int(self.supporter.get_config('General Config', 'Geopy Timeout')))
+                timed_out = True
+            except AttributeError:
+                self.supporter.write_to_log("Skipping invalid address: " + address)
+                self.supporter.write_to_log("Location does not exist or is formatted incorrectly.")
+                return False, None
 
     @staticmethod
     def get_extents(center, hor_distance, vert_distance):
