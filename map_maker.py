@@ -3,7 +3,7 @@ import time
 
 import mapnik
 from geographiclib import geodesic, constants
-from geopy.exc import GeocoderTimedOut
+from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 from geopy.geocoders import Nominatim
 from mapnik import Box2d
 
@@ -19,6 +19,7 @@ class Map_Maker:
         self.supporter = Support(config_file)
         self.supporter.write_to_log('Address2img Initialized.')
         self.supporter.write_to_log('Rendering maps for %s location(s)' % self.number_of_addresses)
+        self.skipped = []  # List of addresses which were skipped due to error or otherwise
 
     @staticmethod
     def get_geolocator(hash_data):
@@ -41,7 +42,6 @@ class Map_Maker:
         return coordinate
 
     def check_address(self, address):
-
         timed_out = False
         while not timed_out:
             try:
@@ -49,14 +49,12 @@ class Map_Maker:
                 test = geocoder.geocode(address).address
                 del test
                 return True, geocoder
-            except GeocoderTimedOut:
+            except GeocoderTimedOut or GeocoderUnavailable:
                 self.supporter.write_to_log("Timed out, trying to connect again")
                 time.sleep(int(self.supporter.get_config('General Config', 'Geopy Timeout')))
                 timed_out = True
             except AttributeError:
-                self.supporter.write_to_log("Skipping invalid address: " + address)
-                self.supporter.write_to_log("Location does not exist or is formatted incorrectly.")
-                return False, None
+                return False, address
 
     @staticmethod
     def get_extents(center, hor_distance, vert_distance):
@@ -85,7 +83,7 @@ class Map_Maker:
     def get_map_name(self, address):
 
         file_type = self.supporter.get_config('Map Image Config', 'Output File Type')
-        image_hash = str(hash(address))[-6:]
+        image_hash = str(hash(address + self.supporter.config_file))[-6:]
         image_folder = self.supporter.get_config('Map Image Config', 'Image Directory')
         if not os.path.exists(image_folder):
             os.makedirs(image_folder)
@@ -116,12 +114,12 @@ class Map_Maker:
 
         for count, address in enumerate(self.addresses):
             address = str(address.encode('utf-8'))
-            address_is_good = self.check_address(address)[0]
-            if address_is_good:
+            address_is_good = self.check_address(address)
+            if address_is_good[0]:
                 geocoder = self.check_address(address)[1]
                 self.supporter.write_to_log("(%s/%s) Starting to render map for %s" %
-                                            (self.number_of_addresses,
-                                             count,
+                                            (count + 1,
+                                             self.number_of_addresses,
                                              self.format_address(geocoder, address)))
                 center = self.convert_address(geocoder, address)
                 extents = self.get_extents(center, hor_distance, vert_distance)
@@ -129,11 +127,17 @@ class Map_Maker:
                 mapnik.render_to_file(m, temp_map)
                 image_name = self.rename_map(temp_map, address)
                 self.supporter.write_to_log("(%s/%s) Rendered map to '%s' for '%s'" %
-                                            (count,
+                                            (count + 1,
                                              self.number_of_addresses,
                                              image_name,
                                              self.format_address(geocoder, address)))
                 self.number_of_rendered = self.number_of_rendered + 1
+            else:
+                self.skipped.append(str(address_is_good[1]))
+                self.supporter.write_to_log("(%s/%s) Skipping invalid address: %s" % (count + 1, self.number_of_addresses,
+                                                                                      str(address_is_good[1])))
+                self.supporter.write_to_log("(%s/%s) Location does not exist or is formatted incorrectly."
+                                            % (count + 1, self.number_of_addresses))
 
     def __del__(self):
         end_time = time.time()
@@ -141,3 +145,8 @@ class Map_Maker:
         self.supporter.write_to_log("Rendered %s maps for %s location(s) in %s seconds." % (self.number_of_rendered,
                                                                                             self.number_of_addresses,
                                                                                             time_to_render))
+        num_skipped = len(self.skipped)
+        if num_skipped > 0:
+            skipped_string = '; '.join(self.skipped)
+            self.supporter.write_to_log("Skipped %s address(es) due to errors." % num_skipped)
+            self.supporter.write_to_log("Skipped address(es): " + skipped_string)
