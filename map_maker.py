@@ -20,6 +20,7 @@ class Map_Maker:
         self.supporter.write_to_log('Address2img Initialized.')
         self.supporter.write_to_log('Rendering maps for %s location(s)' % self.number_of_addresses)
         self.skipped = []  # List of addresses which were skipped due to error or otherwise
+        self.finished_maps = dict()
 
     @staticmethod
     def get_geolocator(hash_data):
@@ -95,7 +96,7 @@ class Map_Maker:
         os.rename(original_map, image_name)
         return image_name
 
-    def make_map(self):
+    def make_maps(self):
         # Renders map with mapnik based off stylesheet and settings in config_file
         temp_dir = str(self.supporter.get_config('General Config', 'Temporary Directory'))
         if not os.path.exists(temp_dir):
@@ -132,12 +133,15 @@ class Map_Maker:
                                              image_name,
                                              self.format_address(geocoder, address)))
                 self.number_of_rendered = self.number_of_rendered + 1
+                self.finished_maps.update({address: image_name})
+
             else:
                 self.skipped.append(str(address_is_good[1]))
                 self.supporter.write_to_log("(%s/%s) Skipping invalid address: %s" % (count + 1, self.number_of_addresses,
                                                                                       str(address_is_good[1])))
                 self.supporter.write_to_log("(%s/%s) Location does not exist or is formatted incorrectly."
                                             % (count + 1, self.number_of_addresses))
+        return self.finished_maps
 
     def __del__(self):
         end_time = time.time()
